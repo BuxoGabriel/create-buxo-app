@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+
+# never let a test run leave node artifacts inside the template
+src/create_buxo_app/template/node_modules/
+src/create_buxo_app/template/.next/
+src/create_buxo_app/template/pnpm-lock.yaml

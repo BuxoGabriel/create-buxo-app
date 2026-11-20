@@ -1,0 +1,4 @@
+# Copy to .env.local and fill in. Never commit real values.
+
+# Set automatically on Vercel (no protocol). Used for canonical URLs, see src/lib/site.ts.
+# VERCEL_PROJECT_PRODUCTION_URL=example.com

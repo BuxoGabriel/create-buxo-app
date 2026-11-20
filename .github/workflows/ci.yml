@@ -1,0 +1,92 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # the oldest version pyproject.toml allows, and the one in .python-version
+        python: ['3.11', '3.13']
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Run tests
+        run: uv run --python ${{ matrix.python }} --locked pytest
+
+  scaffold:
+    name: Scaffold (${{ matrix.name }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # each feature has to compile without the others, and all of them together
+        include:
+          - name: base
+            flags: ''
+          - name: stripe
+            flags: --stripe
+          - name: auth
+            flags: --auth
+          - name: db
+            flags: --db
+          - name: all features
+            flags: --stripe --auth --db
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # installs, generates the theme, and formats; exits non-zero if any of those fail
+      - name: Scaffold a project
+        run: uv run --locked create-buxo-app "$RUNNER_TEMP/site" --yes --no-git ${{ matrix.flags }}
+
+      - name: Check formatting, lint, types, and tests
+        working-directory: ${{ runner.temp }}/site
+        run: pnpm check
+
+      - name: Check generated theme is up to date
+        working-directory: ${{ runner.temp }}/site
+        run: pnpm run theme --check
+
+      - name: Build
+        working-directory: ${{ runner.temp }}/site
+        run: pnpm build

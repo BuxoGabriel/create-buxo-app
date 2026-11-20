@@ -1,0 +1,20 @@
+// Canonical origin for metadata and JSON-LD.
+// Vercel sets VERCEL_PROJECT_PRODUCTION_URL (no protocol) on every build and deployment: the shortest
+// production domain, so it becomes the custom domain once one is assigned. Previews also point at
+// production, keeping canonical/OG/structured-data URLs stable. Locally it falls back to the dev server.
+export const siteUrl = new URL(
+  process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : `http://localhost:${process.env.PORT ?? 3000}`
+);
+
+export function absoluteUrl(path: string): string {
+  return new URL(path, siteUrl).toString();
+}
+
+__SITE_NAME_CONST__
+// Home-screen label, keep it under about 12 characters
+__SITE_SHORT_NAME_CONST__
+__SITE_DESCRIPTION_CONST__
+__AUTHOR_NAME_CONST__
+export const SITE_KEYWORDS: string[] = [];
