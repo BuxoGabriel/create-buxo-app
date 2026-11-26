@@ -68,10 +68,13 @@ its flag is given.
 | Flag       | Adds                                                                                                                                                                    |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--stripe` | `stripe` client, a Checkout server action, and a signature-checked webhook route                                                                                        |
-| `--auth`   | Better Auth: config with optional Google sign-in, route handler, starter sign-in page, `src/proxy.ts`                                                                   |
+| `--auth`   | Better Auth on Postgres through Drizzle: config with optional Google sign-in, schema and client, `db:*` scripts, starter sign-in page, `src/proxy.ts`                   |
 | `--db`     | Only the DAO wrappers: `DaoResponse<T>` success/fail states, `createDaoSuccess`/`createDaoError`, `dbTryCatchResponseWrapper`, `renderError`. No database client or ORM |
 
-`--db` with `--auth` also adds `dbAuthWrapper` (signed-in users only). When any is picked, the project
+`--auth` is the feature that brings a database: it assumes Postgres with Drizzle ORM and adds the
+client, the schema for Better Auth's tables, and the migration scripts. `--db` alone stays wrappers
+only. `--db` with `--auth` also adds `dbAuthWrapper` (signed-in users only), and the database
+checklist then builds on the auth feature's client. When any is picked, the project
 gets a `TODO.md` with the setup steps for exactly those features (accounts, keys, env vars, what to
 write next), their variables in `.env.example`, and an "Added features" section in its README and
 CLAUDE.md. A project with none of them is byte-for-byte what it was before this existed.

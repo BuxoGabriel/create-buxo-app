@@ -236,12 +236,20 @@ def template_files(root: Path = TEMPLATE_DIR) -> list[Path]:
     )
 
 
-def add_dependencies(package_json: str, dependencies: dict[str, str]) -> str:
-    """Add runtime dependencies to a rendered package.json, keeping them sorted as pnpm would."""
-    if not dependencies:
+def add_dependencies(
+    package_json: str,
+    dependencies: dict[str, str],
+    dev_dependencies: dict[str, str] | None = None,
+    scripts: dict[str, str] | None = None,
+) -> str:
+    """Add dependencies and scripts to a rendered package.json. Dependencies stay sorted as pnpm
+    would sort them; scripts go after the template's own, in the order given."""
+    if not (dependencies or dev_dependencies or scripts):
         return package_json
     package = json.loads(package_json)
+    package["scripts"] = {**package["scripts"], **(scripts or {})}
     package["dependencies"] = dict(sorted({**package["dependencies"], **dependencies}.items()))
+    package["devDependencies"] = dict(sorted({**package["devDependencies"], **(dev_dependencies or {})}.items()))
     return json.dumps(package, indent=2) + "\n"
 
 
@@ -280,7 +288,16 @@ def write_project(target: Path, options: ProjectOptions) -> list[Path]:
             path = target / relative
             path.write_text(change(path.read_text(encoding="utf-8")), encoding="utf-8", newline="\n")
 
-        amend("package.json", lambda text: add_dependencies(text, feature_set.dependencies(options.features)))
+        amend(
+            "package.json",
+            lambda text: add_dependencies(
+                text,
+                feature_set.dependencies(options.features),
+                feature_set.dev_dependencies(options.features),
+                feature_set.scripts(options.features),
+            ),
+        )
+        amend(".prettierignore", lambda text: text + feature_set.render_prettier_ignore(options.features))
         amend(".env.example", lambda text: text + feature_set.render_env(options.features))
         amend("CLAUDE.md", lambda text: text + feature_set.render_claude_section(options.features))
         write(Path("TODO.md"), feature_set.render_todo(options.site_name, options.features))

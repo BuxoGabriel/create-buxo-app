@@ -1,6 +1,9 @@
 import { betterAuth } from 'better-auth';
+import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { nextCookies } from 'better-auth/next-js';
 import { headers } from 'next/headers';
+import * as schema from '@/db/schema';
+import { getDb } from './server/drizzle';
 import { siteUrl } from './site';
 
 const SESSION_DURATION = 24 * 60 * 60; // seconds
@@ -17,7 +20,8 @@ const allowedHosts = [siteUrl.host, process.env.VERCEL_URL, process.env.VERCEL_B
   (host): host is string => Boolean(host)
 );
 
-// BETTER_AUTH_SECRET is read from the environment. In production nothing here works without it.
+// BETTER_AUTH_SECRET is read from the environment. Nothing here works without it in production,
+// or without DATABASE_URL anywhere.
 function createAuth() {
   return betterAuth({
     // BETTER_AUTH_URL, when set, pins the site to one origin (needed off Vercel).
@@ -26,8 +30,8 @@ function createAuth() {
       fallback: siteUrl.origin,
       protocol: siteUrl.protocol === 'https:' ? 'https' : 'http',
     },
-    // No `database`: the session lives in an encrypted cookie and nothing is stored on the server.
-    // Add a database here (see TODO.md) to keep users, or to be able to end a session early.
+    // Users, sessions and linked provider accounts are kept in Postgres (src/db/auth-schema.ts).
+    database: drizzleAdapter(getDb(), { provider: 'pg', schema }),
     session: {
       expiresIn: SESSION_DURATION,
     },
@@ -45,7 +49,7 @@ function createAuth() {
 type Auth = ReturnType<typeof createAuth>;
 let instance: Auth | undefined;
 
-/** The Better Auth instance, created on first use so the site builds before the secret is set. */
+/** The Better Auth instance, created on first use so the site builds with no env vars set. */
 export function getAuth(): Auth {
   instance ??= createAuth();
   return instance;
