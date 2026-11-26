@@ -196,7 +196,7 @@ def test_db_feature_is_only_the_wrappers(tmp_path):
     assert not (tmp_path / "src/lib/auth.ts").exists()
 
     dependencies = json.loads((tmp_path / "package.json").read_text())["dependencies"]
-    assert "server-only" in dependencies and "stripe" not in dependencies and "next-auth" not in dependencies
+    assert "server-only" in dependencies and "stripe" not in dependencies and "better-auth" not in dependencies
     assert list(dependencies) == sorted(dependencies)
 
     todo = (tmp_path / "TODO.md").read_text()
@@ -211,7 +211,10 @@ def test_all_features(tmp_path):
         "src/actions/checkout-action.ts",
         "src/app/api/stripe/webhook/route.ts",
         "src/lib/auth.ts",
-        "src/app/api/auth/[...nextauth]/route.ts",
+        "src/lib/auth-redirect.ts",
+        "src/app/api/auth/[...all]/route.ts",
+        "src/actions/auth-actions.ts",
+        "src/app/sign-in/page.tsx",
         "src/proxy.ts",
         "src/lib/server/db.ts",
         "src/lib/server/db-auth.ts",
@@ -220,10 +223,11 @@ def test_all_features(tmp_path):
     assert len(written) == len(set(written))
 
     dependencies = json.loads((tmp_path / "package.json").read_text())["dependencies"]
-    assert {"stripe", "next-auth", "server-only"} <= set(dependencies)
+    assert {"stripe", "better-auth", "server-only"} <= set(dependencies)
+    assert "next-auth" not in dependencies
 
     env = (tmp_path / ".env.example").read_text()
-    for variable in ("STRIPE_SECRET_KEY=", "STRIPE_WEBHOOK_SECRET=", "AUTH_SECRET=", "AUTH_GOOGLE_ID="):
+    for variable in ("STRIPE_SECRET_KEY=", "STRIPE_WEBHOOK_SECRET=", "BETTER_AUTH_SECRET=", "GOOGLE_CLIENT_ID="):
         assert f"\n{variable}\n" in env, variable
 
     todo = (tmp_path / "TODO.md").read_text()
@@ -238,8 +242,10 @@ def test_all_features(tmp_path):
         "Stripe + auth",
         "Before the first deploy",
     ]
-    # every variable the TODO asks for is in .env.example, except the ones the dev names themself
-    for variable in set(re.findall(r"`((?:STRIPE|AUTH)_[A-Z_]+)`", todo)) - {"AUTH_URL", "AUTH_TRUST_HOST"}:
+    # every variable the TODO asks for is in .env.example (BETTER_AUTH_URL as a commented example)
+    variables = set(re.findall(r"`((?:STRIPE|BETTER_AUTH|GOOGLE)_[A-Z_]+)`", todo))
+    assert {"BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "GOOGLE_CLIENT_ID"} <= variables
+    for variable in variables:
         assert f"{variable}=" in env, variable
 
     readme = (tmp_path / "README.md").read_text()

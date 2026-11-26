@@ -55,7 +55,8 @@ each feature alone, and all three together, and runs `pnpm check`, `pnpm theme -
   `createDaoSuccess`, `createDaoError`, `dbTryCatchResponseWrapper`, `renderError`). Do not add a
   database client, ORM, or schema to it.
 - Feature code must build and start with no env vars set (CI has none): the Stripe client is created
-  on first use, Google sign-in switches on only when its variables exist.
+  on first use, so is the Better Auth instance (`getAuth()`), and Google sign-in switches on only
+  when its variables exist.
 - Before editing a dependency version, read "Version pins to revisit" in README.md; several pins
   are deliberate. Check current versions with `pnpm view <pkg> version` rather than from memory.
 - Scaffold test projects outside this repo (a temp directory), never inside `template/`.
@@ -66,4 +67,4 @@ each feature alone, and all three together, and runs `pnpm check`, `pnpm theme -
 
 `uv run pytest`, then scaffold with `--stripe --auth --db`, run `pnpm check && pnpm build`, and for
 single features run `tsc --noEmit` and `eslint .` as well (each must compile without the others).
-For runtime checks under `pnpm start`, Auth.js needs `AUTH_SECRET` and `AUTH_TRUST_HOST=true`.
+For runtime checks under `pnpm start`, Better Auth needs `BETTER_AUTH_SECRET`.

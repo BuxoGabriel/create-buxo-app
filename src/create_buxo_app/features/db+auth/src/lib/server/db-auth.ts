@@ -1,5 +1,5 @@
 import 'server-only';
-import { auth } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import type { DaoResponse } from '@/types';
 import { createDaoError } from './db';
 
@@ -13,8 +13,8 @@ export function dbAuthWrapper<T>(
   callback: () => Promise<DaoResponse<T>>
 ): () => Promise<DaoResponse<T>> {
   return async () => {
-    const session = await auth();
-    if (!session?.user) return createDaoError({ type: 'auth-error' });
+    const session = await getSession();
+    if (!session) return createDaoError({ type: 'auth-error' });
     // TODO: once users have roles, check them here (e.g. take a `role` argument and compare it)
     return await callback();
   };

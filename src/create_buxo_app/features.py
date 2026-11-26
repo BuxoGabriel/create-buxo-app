@@ -90,49 +90,59 @@ STRIPE_PRICE_EXAMPLE=
 
 AUTH = Feature(
     key="auth",
-    label="Auth (Auth.js / next-auth: config, route handler, route protection)",
+    label="Auth (Better Auth: config, route handler, sign-in page, route protection)",
     title="Auth",
     summary=(
-        "Auth.js (`next-auth` v5) configured in `src/lib/auth.ts`; `src/proxy.ts` redirects signed-out "
-        "visitors away from the protected routes."
+        "Better Auth (`better-auth`) configured in `src/lib/auth.ts`; `getSession()` is the check, and "
+        "`src/proxy.ts` redirects signed-out visitors away from the protected routes."
     ),
-    dependencies={"next-auth": "5.0.0-beta.32"},
+    dependencies={"better-auth": "^1.7.28"},
     env="""\
-# Auth.js. Generate the secret with `pnpm dlx auth secret` or `openssl rand -base64 33`.
-AUTH_SECRET=
+# Better Auth. Generate the secret with `openssl rand -base64 32`.
+BETTER_AUTH_SECRET=
+# Only off Vercel: the site's origin. On Vercel and locally it is worked out, see src/lib/auth.ts.
+# BETTER_AUTH_URL=https://example.com
 # Google sign-in is switched on when both are set (https://console.cloud.google.com/apis/credentials)
-AUTH_GOOGLE_ID=
-AUTH_GOOGLE_SECRET=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 """,
     files=(
-        ("src/lib/auth.ts", "Auth.js config: providers, session, callbacks. Exports `auth`, `signIn`, `signOut`"),
-        ("src/app/api/auth/[...nextauth]/route.ts", "The sign-in, callback, and sign-out endpoints"),
-        ("src/proxy.ts", "Sends signed-out visitors to sign in for the routes in `PROTECTED_PREFIXES`"),
+        ("src/lib/auth.ts", "Better Auth config: providers and session. Exports `getSession()` and `getAuth()`"),
+        ("src/lib/auth-redirect.ts", "`safeCallbackPath()`: only paths on this site are followed after sign-in"),
+        ("src/app/api/auth/[...all]/route.ts", "Better Auth's endpoints (OAuth callbacks, session, sign-out)"),
+        ("src/actions/auth-actions.ts", "`signInWithGoogleAction` and `signOutAction`, used as form actions"),
+        ("src/app/sign-in/page.tsx", "Starter sign-in page: one button per sign-in method"),
+        ("src/proxy.ts", "Sends signed-out visitors to `/sign-in` for the routes in `PROTECTED_PREFIXES`"),
     ),
     todo="""\
-- [ ] Generate a secret (`pnpm dlx auth secret`, or `openssl rand -base64 33`) and set it as
-      `AUTH_SECRET` in `.env.local`. Nothing in auth works without it.
-- [ ] Choose the sign-in methods and add them to `providers` in `src/lib/auth.ts`. Google is already
-      wired and switches on when its two variables are set.
+- [ ] Generate a secret (`openssl rand -base64 32`) and set it as `BETTER_AUTH_SECRET` in
+      `.env.local`. In production nothing in auth works without it.
+- [ ] Choose the sign-in methods and add them to `socialProviders` in `src/lib/auth.ts`, with a
+      sign-in action in `src/actions/auth-actions.ts` and a button on `src/app/sign-in/page.tsx`
+      for each. Google is already wired and switches on when its two variables are set.
 - [ ] For Google: create an OAuth client (type "Web application") at
       <https://console.cloud.google.com/apis/credentials>, add the redirect URIs
       `http://localhost:3000/api/auth/callback/google` and
-      `https://<your-domain>/api/auth/callback/google`, and set `AUTH_GOOGLE_ID` and
-      `AUTH_GOOGLE_SECRET`.
-- [ ] Decide who may sign in and enforce it in the `signIn` callback in `src/lib/auth.ts`. As
-      scaffolded, anyone who gets through a provider is signed in.
+      `https://<your-domain>/api/auth/callback/google`, and set `GOOGLE_CLIENT_ID` and
+      `GOOGLE_CLIENT_SECRET`.
+- [ ] Decide who may sign in and enforce it in `mayUseSite()` in `src/lib/auth.ts`. As scaffolded,
+      anyone who gets through a provider is signed in.
 - [ ] Set the routes that need a signed-in user: `PROTECTED_PREFIXES` **and** `config.matcher` in
-      `src/proxy.ts` (it protects `/account` for now). The proxy is a first line only: also call
-      `auth()` in the pages, server actions, and route handlers that read or change private data.
-- [ ] Add sign-in and sign-out controls. In a server component, `<form action={...}>` with a server
-      action that calls `signIn()` / `signOut()` from `@/lib/auth`; show the user with `await auth()`.
-- [ ] If the session should carry more than the user id (a role, for example), add it in the `jwt` and
-      `session` callbacks and declare it in a `src/types/next-auth.d.ts` module augmentation.
-- [ ] For production: set `AUTH_SECRET` and the provider variables in the host's environment
-      variables. Off Vercel, also set `AUTH_URL` to the site's origin, or `AUTH_TRUST_HOST=true`
-      behind a proxy you control. `pnpm start` on your own machine needs `AUTH_TRUST_HOST=true` too
-      (`pnpm dev` does not).
-- [ ] `next-auth` is pinned to a v5 beta. Check for a stable release before launch.
+      `src/proxy.ts` (it protects `/account` for now). The proxy only checks that a session cookie
+      exists, which anyone can fake: also call `getSession()` in the pages, server actions, and
+      route handlers that read or change private data.
+- [ ] Add a sign-out control where signed-in visitors can find it: `<form action={signOutAction}>`
+      with a submit button. Show the user with `await getSession()` in a server component.
+- [ ] Sessions live in an encrypted cookie for 24 hours (`SESSION_DURATION`) and nothing is stored
+      on the server, so one session cannot be ended early. To sign everyone out, change
+      `BETTER_AUTH_SECRET`. To store users and sessions, give Better Auth a database
+      (<https://better-auth.com/docs/concepts/database>).
+- [ ] If the session should carry more than the user (a role, for example), see "Customizing the
+      session" in <https://better-auth.com/docs/concepts/session-management>.
+- [ ] For production: set `BETTER_AUTH_SECRET` and the provider variables in the host's environment
+      variables. On Vercel the site's address is worked out, previews included (each preview address
+      needs its own redirect URI at the provider). Anywhere else, set `BETTER_AUTH_URL` to the
+      site's origin.
 """,
 )
 
@@ -185,10 +195,11 @@ COMBOS: tuple[Combo, ...] = (
 - [ ] Wrap every data-access function that reads or changes private data in `dbAuthWrapper`
       (`src/lib/server/db-auth.ts`), outside the try/catch wrapper:
       `dbAuthWrapper(dbTryCatchResponseWrapper(async () => { ... }))()`.
-- [ ] Add a users table, and look the user up in the `signIn` callback in `src/lib/auth.ts` so only
-      known accounts get in. No adapter is configured, so Auth.js stores nothing by itself.
-- [ ] For username and password sign-in, add the `Credentials` provider and verify the password
-      against a hash from the users table (argon2 or bcrypt). Never store or compare plain passwords.
+- [ ] Give Better Auth the database (`database` in `src/lib/auth.ts`, see
+      <https://better-auth.com/docs/concepts/database>) so it keeps users and sessions in it. Until
+      then it stores nothing, and `mayUseSite()` is the only place to turn an account away.
+- [ ] For email and password sign-in, turn on `emailAndPassword` once the database is connected.
+      Better Auth hashes the passwords; never store or compare plain ones yourself.
 - [ ] Once users have roles, check them in `dbAuthWrapper` (there is a `TODO` at the spot).
 """,
     ),
@@ -206,7 +217,7 @@ COMBOS: tuple[Combo, ...] = (
         keys=("stripe", "auth"),
         title="Stripe + auth",
         todo="""\
-- [ ] In `src/actions/checkout-action.ts`, call `auth()` and pass the user to Stripe
+- [ ] In `src/actions/checkout-action.ts`, call `getSession()` and pass the user to Stripe
       (`client_reference_id: session.user.id`, `customer_email: session.user.email`), so the webhook
       knows who paid. Refuse the checkout when the purchase needs an account and nobody is signed in.
 - [ ] Gate paid content on what the webhook recorded for the user, not on the redirect to the

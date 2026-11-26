@@ -10,7 +10,7 @@ Scaffolds a new website and sets up its repo, like `create-next-app`, but with m
 - **Building-block components**: buttons, cards, text fields, dialog, tags, chips, top bar, nav
   drawer, footer, theme toggle, plus a `/styleguide` page that shows them all
 - SEO plumbing: `pageMetadata()`, JSON-LD, sitemap, robots, manifest, share image
-- **Optional boilerplate**, asked for at scaffold time: Stripe payments, auth (Auth.js), and db
+- **Optional boilerplate**, asked for at scaffold time: Stripe payments, auth (Better Auth), and db
   request/response wrappers, plus a `TODO.md` listing what is left to connect them
 - **Repo setup**: `git init`, first commit on `main`, a `canary` branch, and optionally a GitHub repo
 
@@ -68,7 +68,7 @@ its flag is given.
 | Flag       | Adds                                                                                                                                                                    |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--stripe` | `stripe` client, a Checkout server action, and a signature-checked webhook route                                                                                        |
-| `--auth`   | Auth.js (`next-auth` v5): config with optional Google sign-in, route handler, `src/proxy.ts`                                                                            |
+| `--auth`   | Better Auth: config with optional Google sign-in, route handler, starter sign-in page, `src/proxy.ts`                                                                   |
 | `--db`     | Only the DAO wrappers: `DaoResponse<T>` success/fail states, `createDaoSuccess`/`createDaoError`, `dbTryCatchResponseWrapper`, `renderError`. No database client or ORM |
 
 `--db` with `--auth` also adds `dbAuthWrapper` (signed-in users only). When any is picked, the project
@@ -118,7 +118,6 @@ uv run create-buxo-app /tmp/try-all --yes --stripe --auth --db   # same, for the
 
 ### Version pins to revisit
 
-- `next-auth` is pinned to `5.0.0-beta.32` (in `features.py`): v5 has no stable release yet.
 - `typescript` is held at 6.x: `typescript-eslint` does not support 7.0 yet and lint crashes on it.
 - `@material/material-color-utilities` is pinned to 0.3.0: 0.4.0 ships ESM imports that plain Node
   can't resolve.
