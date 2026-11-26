@@ -196,12 +196,48 @@ def test_db_feature_is_only_the_wrappers(tmp_path):
     assert not (tmp_path / "src/lib/auth.ts").exists()
 
     dependencies = json.loads((tmp_path / "package.json").read_text())["dependencies"]
-    assert "server-only" in dependencies and "stripe" not in dependencies and "next-auth" not in dependencies
+    assert "server-only" in dependencies and "stripe" not in dependencies and "better-auth" not in dependencies
     assert list(dependencies) == sorted(dependencies)
+    # no client, ORM or schema: that comes with auth
+    package = (tmp_path / "package.json").read_text()
+    assert "drizzle" not in package and '"pg"' not in package and "db:generate" not in package
+    assert not (tmp_path / "src/db").exists() and not (tmp_path / "drizzle.config.ts").exists()
+    assert (tmp_path / ".prettierignore").read_text() == (TEMPLATE_DIR / "dot_prettierignore").read_text()
 
     todo = (tmp_path / "TODO.md").read_text()
     assert todo.startswith("# TODO: finish connecting database\n")
     assert "## Database" in todo and "## Stripe" not in todo and "## Auth" not in todo
+    assert "Choose a database" in todo
+
+
+def test_auth_feature_brings_postgres_and_drizzle(tmp_path):
+    _project(tmp_path, "auth")
+    for expected in (
+        "src/lib/auth.ts",
+        "src/db/auth-schema.ts",
+        "src/db/schema.ts",
+        "src/lib/server/drizzle.ts",
+        "drizzle.config.ts",
+    ):
+        assert (tmp_path / expected).is_file(), expected
+    assert not (tmp_path / "src/lib/server/db.ts").exists()  # the wrappers are the db feature
+    assert "drizzleAdapter(getDb()" in (tmp_path / "src/lib/auth.ts").read_text()
+
+    package = json.loads((tmp_path / "package.json").read_text())
+    assert {"better-auth", "drizzle-orm", "pg", "server-only"} <= set(package["dependencies"])
+    assert {"drizzle-kit", "@types/pg"} <= set(package["devDependencies"])
+    for group in ("dependencies", "devDependencies"):
+        assert list(package[group]) == sorted(package[group]), group
+    assert package["scripts"]["db:generate"] == "drizzle-kit generate"
+    assert package["scripts"]["db:migrate"] == "drizzle-kit migrate"
+    # the template's own scripts are still there, ahead of the added ones
+    base_scripts = json.loads((TEMPLATE_DIR / "package.json.tmpl").read_text())["scripts"]
+    assert list(package["scripts"])[: len(base_scripts)] == list(base_scripts)
+
+    assert "\nDATABASE_URL=\n" in (tmp_path / ".env.example").read_text()
+    assert (tmp_path / ".prettierignore").read_text().endswith("\ndrizzle/meta\n")
+    todo = (tmp_path / "TODO.md").read_text()
+    assert "`DATABASE_URL`" in todo and "pnpm db:migrate" in todo
 
 
 def test_all_features(tmp_path):
@@ -211,8 +247,13 @@ def test_all_features(tmp_path):
         "src/actions/checkout-action.ts",
         "src/app/api/stripe/webhook/route.ts",
         "src/lib/auth.ts",
-        "src/app/api/auth/[...nextauth]/route.ts",
+        "src/lib/auth-redirect.ts",
+        "src/app/api/auth/[...all]/route.ts",
+        "src/actions/auth-actions.ts",
+        "src/app/sign-in/page.tsx",
         "src/proxy.ts",
+        "src/db/schema.ts",
+        "src/lib/server/drizzle.ts",
         "src/lib/server/db.ts",
         "src/lib/server/db-auth.ts",
     ):
@@ -220,10 +261,11 @@ def test_all_features(tmp_path):
     assert len(written) == len(set(written))
 
     dependencies = json.loads((tmp_path / "package.json").read_text())["dependencies"]
-    assert {"stripe", "next-auth", "server-only"} <= set(dependencies)
+    assert {"stripe", "better-auth", "server-only"} <= set(dependencies)
+    assert "next-auth" not in dependencies
 
     env = (tmp_path / ".env.example").read_text()
-    for variable in ("STRIPE_SECRET_KEY=", "STRIPE_WEBHOOK_SECRET=", "AUTH_SECRET=", "AUTH_GOOGLE_ID="):
+    for variable in ("STRIPE_SECRET_KEY=", "STRIPE_WEBHOOK_SECRET=", "DATABASE_URL=", "BETTER_AUTH_SECRET=", "GOOGLE_CLIENT_ID="):
         assert f"\n{variable}\n" in env, variable
 
     todo = (tmp_path / "TODO.md").read_text()
@@ -238,8 +280,12 @@ def test_all_features(tmp_path):
         "Stripe + auth",
         "Before the first deploy",
     ]
-    # every variable the TODO asks for is in .env.example, except the ones the dev names themself
-    for variable in set(re.findall(r"`((?:STRIPE|AUTH)_[A-Z_]+)`", todo)) - {"AUTH_URL", "AUTH_TRUST_HOST"}:
+    # every variable the TODO asks for is in .env.example (BETTER_AUTH_URL as a commented example)
+    variables = set(re.findall(r"`((?:STRIPE|BETTER_AUTH|GOOGLE|DATABASE)_[A-Z_]+)`", todo))
+    assert {"DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "GOOGLE_CLIENT_ID"} <= variables
+    # auth brought the database, so the db checklist no longer asks the dev to choose one
+    assert "Choose a database" not in todo and "came with auth" in todo
+    for variable in variables:
         assert f"{variable}=" in env, variable
 
     readme = (tmp_path / "README.md").read_text()

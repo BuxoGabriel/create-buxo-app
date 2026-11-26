@@ -24,7 +24,8 @@ each feature alone, and all three together, and runs `pnpm check`, `pnpm theme -
 - `src/create_buxo_app/scaffold.py` — pure rendering: `ProjectOptions`, `_tokens()`,
   `write_project()`. No prompts, no subprocesses, so it is what the tests exercise.
 - `src/create_buxo_app/features.py` — the optional boilerplate (`stripe`, `auth`, `db`): each
-  feature's dependencies, env vars, README rows, and TODO.md checklist, plus `COMBOS` for pairs.
+  feature's dependencies, scripts, env vars, README rows, and TODO.md checklist, plus `COMBOS` for
+  pairs.
 - `src/create_buxo_app/template/` — the base project, copied as is.
 - `src/create_buxo_app/features/<key>/` — files a feature lays over the template.
   `features/db+auth/` is only added when both are picked.
@@ -53,9 +54,16 @@ each feature alone, and all three together, and runs `pnpm check`, `pnpm theme -
   goes in its `env` text (a test checks that TODO.md and `.env.example` agree).
 - The `db` feature is deliberately only the DAO request/response wrappers (`DaoResponse<T>`,
   `createDaoSuccess`, `createDaoError`, `dbTryCatchResponseWrapper`, `renderError`). Do not add a
-  database client, ORM, or schema to it.
+  database client, ORM, or schema to it. Those belong to `auth`, which assumes Postgres with
+  Drizzle (`src/db/`, `src/lib/server/drizzle.ts`, `drizzle.config.ts`, the `db:*` scripts). When
+  both are picked, `DB.todo_with["auth"]` replaces the db checklist so it does not ask the developer
+  to choose a database again.
+- `features/auth/src/db/auth-schema.ts` is the output of Better Auth's CLI
+  (`pnpm dlx auth@<version> generate`) with `.enableRLS()` added to each table and Prettier applied.
+  Regenerate it when the `better-auth` version changes its core schema.
 - Feature code must build and start with no env vars set (CI has none): the Stripe client is created
-  on first use, Google sign-in switches on only when its variables exist.
+  on first use, so are the Better Auth instance (`getAuth()`) and the database pool (`getDb()`), and
+  Google sign-in switches on only when its variables exist.
 - Before editing a dependency version, read "Version pins to revisit" in README.md; several pins
   are deliberate. Check current versions with `pnpm view <pkg> version` rather than from memory.
 - Scaffold test projects outside this repo (a temp directory), never inside `template/`.
@@ -66,4 +74,5 @@ each feature alone, and all three together, and runs `pnpm check`, `pnpm theme -
 
 `uv run pytest`, then scaffold with `--stripe --auth --db`, run `pnpm check && pnpm build`, and for
 single features run `tsc --noEmit` and `eslint .` as well (each must compile without the others).
-For runtime checks under `pnpm start`, Auth.js needs `AUTH_SECRET` and `AUTH_TRUST_HOST=true`.
+For runtime checks under `pnpm start`, auth needs `BETTER_AUTH_SECRET` and a `DATABASE_URL` pointing
+at a Postgres with the migrations applied (`pnpm db:generate && pnpm db:migrate`).
